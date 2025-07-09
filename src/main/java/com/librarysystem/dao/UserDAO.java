@@ -361,4 +361,56 @@ public class UserDAO {
             return pstmt.executeUpdate() > 0;
         }
     }
+
+    // --- Reporting Methods for UserDAO ---
+
+    public List<com.librarysystem.dto.ActiveInactiveMemberDTO> getActiveVsInactiveMembers(int periodInMonths) throws SQLException {
+        List<com.librarysystem.dto.ActiveInactiveMemberDTO> result = new ArrayList<>();
+
+        // Calculate the date threshold for inactivity
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.MONTH, -periodInMonths);
+        Timestamp activityThresholdDate = new Timestamp(cal.getTimeInMillis());
+
+        // Query to count active members (those with loans within the period)
+        // This definition of "active" is based on loan activity.
+        // Another definition could be based on Users.LastLoginDate.
+        // Or Users.MembershipStatus if that's diligently updated.
+        // For this example, active means having a loan issued after the threshold date.
+        String activeSql = "SELECT COUNT(DISTINCT u.UserID) AS MemberCount " +
+                           "FROM Users u JOIN Loans l ON u.UserID = l.MemberID " +
+                           "WHERE u.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'ROLE_MEMBER') " + // Assuming members have ROLE_MEMBER
+                           "AND l.IssueDate >= ?";
+
+        long activeCount = 0;
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmtActive = conn.prepareStatement(activeSql)) {
+            pstmtActive.setTimestamp(1, activityThresholdDate);
+            try (ResultSet rsActive = pstmtActive.executeQuery()) {
+                if (rsActive.next()) {
+                    activeCount = rsActive.getLong("MemberCount");
+                }
+            }
+        }
+        result.add(new com.librarysystem.dto.ActiveInactiveMemberDTO("Active (Loan in last " + periodInMonths + " months)", activeCount));
+
+        // Query to count total members
+        String totalMembersSql = "SELECT COUNT(u.UserID) AS TotalMemberCount " +
+                                 "FROM Users u " +
+                                 "WHERE u.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'ROLE_MEMBER')";
+        long totalMemberCount = 0;
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmtTotal = conn.prepareStatement(totalMembersSql)) {
+            try (ResultSet rsTotal = pstmtTotal.executeQuery()) {
+                if (rsTotal.next()) {
+                    totalMemberCount = rsTotal.getLong("TotalMemberCount");
+                }
+            }
+        }
+
+        long inactiveCount = totalMemberCount - activeCount;
+        result.add(new com.librarysystem.dto.ActiveInactiveMemberDTO("Inactive (No loan in last " + periodInMonths + " months)", inactiveCount));
+
+        return result;
+    }
 }

@@ -7,22 +7,11 @@
     <style>
         .module-links { list-style: none; padding: 0; }
         .module-links li { margin-bottom: 10px; }
+        .sub-module-links { list-style: square; padding-left: 20px; }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="${pageContext.request.contextPath}/index.jsp">Home</a>
-        <%-- Basic User Info/Login Link --%>
-        <c:choose>
-            <c:when test="${not empty sessionScope.user}">
-                <span>Welcome, <c:out value="${sessionScope.user.username}"/> (<c:out value="${sessionScope.user.role}"/>)</span>
-                <a href="${pageContext.request.contextPath}/user/logout">Logout</a> <%-- Assuming /user/logout path --%>
-            </c:when>
-            <c:otherwise>
-                <a href="${pageContext.request.contextPath}/user/login">Login</a> <%-- Assuming /user/login path --%>
-            </c:otherwise>
-        </c:choose>
-    </div>
+    <c:import url="/WEB-INF/jsp/common/navbar.jsp"/>
 
     <div class="container">
         <h1>Welcome to the Library Management System</h1>

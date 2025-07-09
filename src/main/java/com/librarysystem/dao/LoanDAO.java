@@ -276,11 +276,228 @@ public class LoanDAO {
         return loan;
     }
      // Dummy Book model for compilation within LoanDAO methods.
-    private static class Book {
-        private String title;
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
+    // private static class Book { // Commented out as actual Book model should be used
+    //     private String title;
+    //     public String getTitle() { return title; }
+    //     public void setTitle(String title) { this.title = title; }
+    // }
+
+    // --- Reporting Methods ---
+
+    /**
+     * Gets checkout counts based on specified criteria.
+     * @param periodType "Daily", "Monthly", "By_Branch", "By_Category", "By_Format"
+     * @param startDate Start of the period for filtering loans
+     * @param endDate End of the period for filtering loans
+     * @param branchId Optional branch filter (LocationID) for filtering loans
+     * @param categoryId Optional category filter for filtering loans
+     * @param format Optional item format/type filter for filtering loans
+     * @return List of CheckoutCountDTOs
+     */
+    public List<com.librarysystem.dto.CheckoutCountDTO> getCheckoutCounts(
+            String periodType, Timestamp startDate, Timestamp endDate,
+            Integer branchId, Integer categoryId, String format) throws SQLException {
+
+        List<com.librarysystem.dto.CheckoutCountDTO> counts = new ArrayList<>();
+        StringBuilder sqlSelect = new StringBuilder("SELECT ");
+        StringBuilder sqlFrom = new StringBuilder("FROM Loans l ");
+        StringBuilder sqlWhere = new StringBuilder("WHERE l.IssueDate >= ? AND l.IssueDate <= ? ");
+        StringBuilder sqlGroupBy = new StringBuilder("GROUP BY ");
+        StringBuilder sqlOrderBy = new StringBuilder("ORDER BY PeriodDimension");
+
+        List<Object> params = new ArrayList<>();
+        params.add(startDate);
+        params.add(endDate);
+
+        String dimensionExpression;
+
+        // Base joins (always needed if any filter or grouping on item properties is applied)
+        sqlFrom.append("JOIN Copies cp ON l.CopyID = cp.CopyID ");
+        sqlFrom.append("JOIN Books bk ON cp.BookID = bk.BookID ");
+
+        // Flags to track if joins are already added to avoid duplicate joins
+        boolean locationAlreadyJoined = false;
+        boolean categoryTablesAlreadyJoined = false;
+
+        switch (periodType.toUpperCase()) {
+            case "DAILY":
+                dimensionExpression = "CAST(l.IssueDate AS DATE)";
+                break;
+            case "MONTHLY":
+                dimensionExpression = "VARCHAR_FORMAT(l.IssueDate, 'YYYY-MM')";
+                break;
+            case "BY_BRANCH":
+                if (!sqlFrom.toString().toUpperCase().contains(" LOCATIONS LOC ")) {
+                    sqlFrom.append("LEFT JOIN Locations loc ON cp.LocationID = loc.LocationID ");
+                    locationAlreadyJoined = true;
+                }
+                dimensionExpression = "loc.BranchName";
+                break;
+            case "BY_CATEGORY":
+                if (!sqlFrom.toString().toUpperCase().contains(" BOOKCATEGORIES BC ")) {
+                    sqlFrom.append("LEFT JOIN BookCategories bc ON bk.BookID = bc.BookID LEFT JOIN Categories cat ON bc.CategoryID = cat.CategoryID ");
+                    categoryTablesAlreadyJoined = true;
+                }
+                dimensionExpression = "cat.CategoryName";
+                break;
+            case "BY_FORMAT":
+                dimensionExpression = "bk.Format";
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported periodType/dimension for checkout counts: " + periodType);
+        }
+
+        sqlSelect.append(dimensionExpression).append(" AS PeriodDimension, COUNT(DISTINCT l.LoanID) AS CheckoutCount ");
+        sqlGroupBy.append(dimensionExpression);
+
+        // Add filters to WHERE clause, ensuring necessary joins are present
+        if (branchId != null) {
+            if (!locationAlreadyJoined && !sqlFrom.toString().toUpperCase().contains(" LOCATIONS LOC ")) {
+                 sqlFrom.append("LEFT JOIN Locations loc ON cp.LocationID = loc.LocationID ");
+            }
+            sqlWhere.append("AND cp.LocationID = ? ");
+            params.add(branchId);
+        }
+        if (categoryId != null) {
+             if (!categoryTablesAlreadyJoined && !sqlFrom.toString().toUpperCase().contains(" BOOKCATEGORIES BC ")) {
+                 sqlFrom.append("LEFT JOIN BookCategories bc ON bk.BookID = bc.BookID LEFT JOIN Categories cat ON bc.CategoryID = cat.CategoryID ");
+            }
+            sqlWhere.append("AND bc.CategoryID = ? ");
+            params.add(categoryId);
+        }
+        if (format != null && !format.isEmpty()) {
+            sqlWhere.append("AND bk.Format = ? ");
+            params.add(format);
+        }
+
+        String finalSql = sqlSelect.toString() + sqlFrom.toString() + sqlWhere.toString() + sqlGroupBy.toString() + sqlOrderBy.toString();
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(finalSql)) {
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+            // System.out.println("Executing CheckoutCounts SQL (" + periodType + "): " + pstmt.toString()); // For debugging
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String dimValue = rs.getString("PeriodDimension");
+                     if (dimValue == null) {
+                        dimValue = "(Not Set/Unknown)";
+                    }
+                    counts.add(new com.librarysystem.dto.CheckoutCountDTO(dimValue, rs.getLong("CheckoutCount")));
+                }
+            }
+        }
+        return counts;
     }
+
+    public List<com.librarysystem.dto.OverdueItemDTO> getOverdueItemsReport(Integer branchId, Integer memberIdFilter) throws SQLException {
+        List<com.librarysystem.dto.OverdueItemDTO> overdueItems = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+            "SELECT l.LoanID, u.FirstName || ' ' || u.LastName AS MemberName, u.UserID as MemberId, " +
+            "b.Title AS BookTitle, cp.CopyBarcode, cp.CopyID as CopyId, l.IssueDate, l.DueDate, loc.BranchName " +
+            "FROM Loans l " +
+            "JOIN Users u ON l.MemberID = u.UserID " +
+            "JOIN Copies cp ON l.CopyID = cp.CopyID " +
+            "JOIN Books b ON cp.BookID = b.BookID " +
+            "LEFT JOIN Locations loc ON cp.LocationID = loc.LocationID " +
+            "WHERE l.LoanStatus IN ('ACTIVE', 'OVERDUE') AND l.DueDate < ? "
+        );
+        List<Object> params = new ArrayList<>();
+        params.add(new Timestamp(System.currentTimeMillis()));
+
+        if (branchId != null) {
+            sql.append("AND cp.LocationID = ? ");
+            params.add(branchId);
+        }
+        if (memberIdFilter != null) {
+            sql.append("AND l.MemberID = ? ");
+            params.add(memberIdFilter);
+        }
+        sql.append("ORDER BY l.DueDate ASC, MemberName ASC");
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+            // System.out.println("Executing OverdueItems SQL: " + pstmt.toString()); // For debugging
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    overdueItems.add(new com.librarysystem.dto.OverdueItemDTO(
+                        rs.getLong("LoanID"),
+                        rs.getString("MemberName"),
+                        rs.getInt("MemberId"),
+                        rs.getString("BookTitle"),
+                        rs.getString("CopyBarcode"),
+                        rs.getInt("CopyId"),
+                        rs.getTimestamp("IssueDate"),
+                        rs.getTimestamp("DueDate"),
+                        rs.getString("BranchName")
+                    ));
+                }
+            }
+        }
+        return overdueItems;
+    }
+
+    public List<com.librarysystem.dto.TopBorrowerDTO> getTopBorrowers(Timestamp startDate, Timestamp endDate, int limit) throws SQLException {
+        List<com.librarysystem.dto.TopBorrowerDTO> topBorrowers = new ArrayList<>();
+        String sql = "SELECT l.MemberID, u.FirstName || ' ' || u.LastName AS MemberName, COUNT(DISTINCT l.LoanID) AS CheckoutCount " +
+                     "FROM Loans l JOIN Users u ON l.MemberID = u.UserID " +
+                     "WHERE l.IssueDate >= ? AND l.IssueDate <= ? " +
+                     "GROUP BY l.MemberID, u.FirstName, u.LastName " +
+                     "ORDER BY CheckoutCount DESC, MemberName ASC " +
+                     "FETCH FIRST ? ROWS ONLY";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setTimestamp(1, startDate);
+            pstmt.setTimestamp(2, endDate);
+            pstmt.setInt(3, limit);
+            // System.out.println("Executing TopBorrowers SQL: " + pstmt.toString()); // For debugging
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    topBorrowers.add(new com.librarysystem.dto.TopBorrowerDTO(
+                        rs.getInt("MemberID"),
+                        rs.getString("MemberName"),
+                        rs.getLong("CheckoutCount")
+                    ));
+                }
+            }
+        }
+        return topBorrowers;
+    }
+
+    public List<com.librarysystem.dto.TopCirculatingItemDTO> getTopCirculatingItems(Timestamp startDate, Timestamp endDate, int limit) throws SQLException {
+        List<com.librarysystem.dto.TopCirculatingItemDTO> topItems = new ArrayList<>();
+        String sql = "SELECT b.BookID, b.Title, b.ISBN, COUNT(DISTINCT l.LoanID) AS CheckoutCount " +
+                     "FROM Loans l " +
+                     "JOIN Copies cp ON l.CopyID = cp.CopyID " +
+                     "JOIN Books b ON cp.BookID = b.BookID " +
+                     "WHERE l.IssueDate >= ? AND l.IssueDate <= ? " +
+                     "GROUP BY b.BookID, b.Title, b.ISBN " +
+                     "ORDER BY CheckoutCount DESC, b.Title ASC " +
+                     "FETCH FIRST ? ROWS ONLY";
+         try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setTimestamp(1, startDate);
+            pstmt.setTimestamp(2, endDate);
+            pstmt.setInt(3, limit);
+            // System.out.println("Executing TopCirculatingItems SQL: " + pstmt.toString()); // For debugging
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    topItems.add(new com.librarysystem.dto.TopCirculatingItemDTO(
+                        rs.getInt("BookID"),
+                        rs.getString("Title"),
+                        rs.getString("ISBN"),
+                        rs.getLong("CheckoutCount")
+                    ));
+                }
+            }
+        }
+        return topItems;
+    }
+
 }
 
 // Dummy CopyDAO class for compilation. Replace with actual implementation.

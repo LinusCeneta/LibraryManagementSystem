@@ -202,4 +202,14 @@
         <dispatcher>FORWARD</dispatcher>
     </filter-mapping>
 
+    <!-- Catalog Servlet -->
+    <servlet>
+        <servlet-name>CatalogServlet</servlet-name>
+        <servlet-class>com.librarysystem.servlet.CatalogServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>CatalogServlet</servlet-name>
+        <url-pattern>/catalog/*</url-pattern>
+    </servlet-mapping>
+
 </web-app>
