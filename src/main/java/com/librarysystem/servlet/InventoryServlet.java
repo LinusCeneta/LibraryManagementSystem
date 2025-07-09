@@ -23,10 +23,13 @@ public class InventoryServlet extends HttpServlet {
     private InventoryAdjustmentDAO adjustmentDAO;
     // private CopyDAO copyDAO; // For fetching copy details
     // private BookDAO bookDAO; // For fetching book details related to a copy
+    private AuditLogDAO auditLogDAO;
+
 
     @Override
     public void init() throws ServletException {
         adjustmentDAO = new InventoryAdjustmentDAO();
+        auditLogDAO = new AuditLogDAO(); // Initialize AuditLogDAO
         // copyDAO = new CopyDAO();
         // bookDAO = new BookDAO();
     }
@@ -177,9 +180,35 @@ public class InventoryServlet extends HttpServlet {
 
         // The InventoryAdjustmentDAO's createAdjustment method should handle updating the Copy's status/quantity.
         // That logic is currently a placeholder in the DAO.
-        adjustmentDAO.createAdjustment(adj);
+        InventoryAdjustment createdAdj = adjustmentDAO.createAdjustment(adj);
 
-        resp.sendRedirect(req.getContextPath() + "/inventory/adjustments/view?id=" + adj.getAdjustmentID());
+        // Audit Log
+        if (currentUser != null && auditLogDAO != null && createdAdj != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(currentUser.getUserID(), currentUser.getUsername(), "INVENTORY_ADJUSTMENT_CREATE", getClientIpAddr(req), "AdjID: " + createdAdj.getAdjustmentID() + ", CopyID: " + createdAdj.getCopyID() + ", Reason: " + createdAdj.getReason() + ", QtyChange: " + createdAdj.getQuantityChange()));
+        }
+
+        resp.sendRedirect(req.getContextPath() + "/inventory/adjustments/view?id=" + createdAdj.getAdjustmentID());
+    }
+
+    // --- Helper to get client IP (if not already in a base servlet or utility) ---
+    private String getClientIpAddr(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        return ip;
     }
 
     // --- Placeholder for Audit/Cycle Count Methods ---

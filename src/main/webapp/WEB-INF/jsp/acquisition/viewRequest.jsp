@@ -69,11 +69,13 @@
         <h2>Actions</h2>
         <c:if test="${request.status == 'Pending'}">
             <form action="${pageContext.request.contextPath}/acquisition/requests/updateStatus" method="post" style="display:inline-block; margin-right: 10px;">
+                <input type="hidden" name="_csrf" value="${_csrf}">
                 <input type="hidden" name="requestId" value="${request.requestID}">
                 <input type="hidden" name="status" value="Approved">
                 <button type="submit">Approve Request</button>
             </form>
             <form action="${pageContext.request.contextPath}/acquisition/requests/updateStatus" method="post" style="display:inline-block; margin-right: 10px;">
+                <input type="hidden" name="_csrf" value="${_csrf}">
                 <input type="hidden" name="requestId" value="${request.requestID}">
                 <input type="hidden" name="status" value="Rejected">
                 <button type="submit">Reject Request</button>
@@ -84,6 +86,7 @@
         </c:if>
         <br><br>
         <form action="${pageContext.request.contextPath}/acquisition/requests/delete?id=${request.requestID}" method="post" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this request? This action cannot be undone.');">
+            <input type="hidden" name="_csrf" value="${_csrf}">
             <input type="hidden" name="id" value="${request.requestID}">
             <button type="submit" class="button-danger">Delete Request</button>
         </form>

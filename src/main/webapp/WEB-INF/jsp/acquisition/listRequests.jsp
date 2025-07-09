@@ -46,12 +46,14 @@
                             <c:if test="${request.status == 'Pending'}">
                                 <%-- Form to Approve Request --%>
                                 <form action="${pageContext.request.contextPath}/acquisition/requests/updateStatus" method="post" style="display:inline;">
+                                    <input type="hidden" name="_csrf" value="${_csrf}">
                                     <input type="hidden" name="requestId" value="${request.requestID}">
                                     <input type="hidden" name="status" value="Approved">
                                     <button type="submit">Approve</button>
                                 </form>
                                 <%-- Form to Reject Request --%>
                                 <form action="${pageContext.request.contextPath}/acquisition/requests/updateStatus" method="post" style="display:inline;">
+                                    <input type="hidden" name="_csrf" value="${_csrf}">
                                     <input type="hidden" name="requestId" value="${request.requestID}">
                                     <input type="hidden" name="status" value="Rejected">
                                     <button type="submit">Reject</button>
@@ -61,6 +63,7 @@
                                 <a href="${pageContext.request.contextPath}/acquisition/po/new?requestId=${request.requestID}">Create PO</a>
                             </c:if>
                              <form action="${pageContext.request.contextPath}/acquisition/requests/delete?id=${request.requestID}" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this request?');">
+                                <input type="hidden" name="_csrf" value="${_csrf}">
                                 <input type="hidden" name="id" value="${request.requestID}">
                                 <button type="submit">Delete</button>
                             </form>

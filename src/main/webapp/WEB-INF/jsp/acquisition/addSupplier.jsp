@@ -14,7 +14,7 @@
         </c:if>
 
         <form action="${pageContext.request.contextPath}/acquisition/suppliers/add" method="post">
-            <%-- Add CSRF token here if implemented --%>
+            <input type="hidden" name="_csrf" value="${_csrf}">
             <p>
                 <label for="supplierName">Supplier Name:</label><br>
                 <input type="text" id="supplierName" name="supplierName" required>

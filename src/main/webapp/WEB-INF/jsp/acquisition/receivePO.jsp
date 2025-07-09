@@ -44,8 +44,8 @@
 
         <c:if test="${purchaseOrder.status != 'Closed' && purchaseOrder.status != 'Fully Received'}">
             <form action="${pageContext.request.contextPath}/acquisition/po/receive" method="post">
+                <input type="hidden" name="_csrf" value="${_csrf}">
                 <input type="hidden" name="poId" value="${purchaseOrder.poID}">
-                <%-- CSRF token if implemented --%>
 
                 <fieldset class="grn-header">
                     <legend>Goods Receipt Note (GRN) Details</legend>

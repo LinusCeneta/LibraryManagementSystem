@@ -113,11 +113,13 @@
             <%-- Placeholder for other actions like updating status, cancelling PO --%>
             <c:if test="${purchaseOrder.status == 'Created' || purchaseOrder.status == 'Submitted'}">
                  <form action="${pageContext.request.contextPath}/acquisition/po/updateStatus" method="post" style="display:inline-block; margin: 5px;">
+                    <input type="hidden" name="_csrf" value="${_csrf}">
                     <input type="hidden" name="poId" value="${purchaseOrder.poID}">
                     <input type="hidden" name="status" value="Submitted">
                     <button type="submit" <c:if test="${purchaseOrder.status != 'Created'}">disabled</c:if>>Mark as Submitted</button>
                 </form>
                 <form action="${pageContext.request.contextPath}/acquisition/po/updateStatus" method="post" style="display:inline-block; margin: 5px;">
+                    <input type="hidden" name="_csrf" value="${_csrf}">
                     <input type="hidden" name="poId" value="${purchaseOrder.poID}">
                     <input type="hidden" name="status" value="Cancelled">
                     <button type="submit" class="button-danger" onclick="return confirm('Are you sure you want to cancel this PO?');">Cancel PO</button>
@@ -125,6 +127,7 @@
             </c:if>
              <c:if test="${purchaseOrder.status == 'Partially Received' || purchaseOrder.status == 'Fully Received'}">
                  <form action="${pageContext.request.contextPath}/acquisition/po/updateStatus" method="post" style="display:inline-block; margin: 5px;">
+                    <input type="hidden" name="_csrf" value="${_csrf}">
                     <input type="hidden" name="poId" value="${purchaseOrder.poID}">
                     <input type="hidden" name="status" value="Closed">
                     <button type="submit" <c:if test="${purchaseOrder.status == 'Closed'}">disabled</c:if>>Close PO</button>

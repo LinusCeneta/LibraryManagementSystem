@@ -83,24 +83,19 @@
 
     <security-constraint>
         <web-resource-collection>
-            <web-resource-name>Acquisition Module</web-resource-name>
+            <web-resource-name>Acquisition Module Staff Access</web-resource-name>
             <url-pattern>/acquisition/*</url-pattern>
-            <http-method>GET</http-method>
-            <http-method>POST</http-method>
         </web-resource-collection>
         <auth-constraint>
             <role-name>ROLE_STAFF</role-name>
             <role-name>ROLE_ADMIN</role-name>
-            <%-- Add other roles that need access --%>
         </auth-constraint>
     </security-constraint>
 
     <security-constraint>
         <web-resource-collection>
-            <web-resource-name>Inventory Module</web-resource-name>
+            <web-resource-name>Inventory Module Staff Access</web-resource-name>
             <url-pattern>/inventory/*</url-pattern>
-            <http-method>GET</http-method>
-            <http-method>POST</http-method>
         </web-resource-collection>
         <auth-constraint>
             <role-name>ROLE_STAFF</role-name>
@@ -108,18 +103,55 @@
         </auth-constraint>
     </security-constraint>
 
-    <!-- Define security roles used in constraints (actual role definition happens in Tomcat or your auth mechanism) -->
-    <security-role>
-        <role-name>ROLE_STAFF</role-name>
-    </security-role>
+    <!-- User Profile access for all authenticated users -->
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>User Profile Management</web-resource-name>
+            <url-pattern>/user/profile</url-pattern>
+            <url-pattern>/user/editProfile</url-pattern>
+            <url-pattern>/user/changePassword</url-pattern>
+            <!-- Logout is typically public or handled by filter -->
+        </web-resource-collection>
+        <auth-constraint>
+            <role-name>ROLE_ADMIN</role-name>
+            <role-name>ROLE_STAFF</role-name>
+            <role-name>ROLE_MEMBER</role-name>
+        </auth-constraint>
+    </security-constraint>
+
+    <!-- Admin specific user management -->
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>Admin User Management</web-resource-name>
+            <url-pattern>/user/admin/*</url-pattern>
+        </web-resource-collection>
+        <auth-constraint>
+            <role-name>ROLE_ADMIN</role-name>
+        </auth-constraint>
+    </security-constraint>
+
+    <!-- Publicly accessible user actions (registration, login, password reset) -->
+    <!-- No <auth-constraint> means public -->
+    <!-- Note: /user/login POST is handled by UserServlet which doesn't require auth to attempt login -->
+    <!--       /user/register POST is also public to allow registration -->
+    <!--       /user/forgotPassword and /user/resetPassword are also public by nature -->
+
+
+    <!-- Define security roles used in constraints -->
     <security-role>
         <role-name>ROLE_ADMIN</role-name>
     </security-role>
     <security-role>
-        <role-name>ROLE_MEMBER</role-name> <%-- Example, if members have some restricted access --%>
+        <role-name>ROLE_STAFF</role-name>
+    </security-role>
+    <security-role>
+        <role-name>ROLE_MEMBER</role-name>
     </security-role>
 
-    <!-- Login Configuration (if using FORM based authentication) -->
+    <!-- Login Configuration (if using FORM based authentication with container-managed security) -->
+    <!-- This tells the container where your login page is if a protected resource is accessed without auth. -->
+    <!-- The UserServlet currently handles login logic directly, so this might be redundant unless -->
+    <!-- you switch to full container-managed security for auth. -->
     <!--
     <login-config>
         <auth-method>FORM</auth-method>
@@ -144,5 +176,30 @@
         <exception-type>java.lang.Throwable</exception-type>
         <location>/WEB-INF/jsp/error/exception.jsp</location> <!-- Create this JSP -->
     </error-page>
+
+    <!-- CSRF Token Filter -->
+    <filter>
+        <filter-name>CSRFTokenFilter</filter-name>
+        <filter-class>com.librarysystem.filter.CSRFTokenFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>CSRFTokenFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+        <dispatcher>FORWARD</dispatcher>
+    </filter-mapping>
+
+    <!-- Authentication Filter (Order matters: CSRF often runs after Auth, or Auth needs to handle public resources for CSRF token generation) -->
+    <!-- Let's place AuthFilter before CSRF so that CSRF filter has session for token generation -->
+    <filter>
+        <filter-name>AuthenticationFilter</filter-name>
+        <filter-class>com.librarysystem.filter.AuthenticationFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>AuthenticationFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+        <dispatcher>FORWARD</dispatcher>
+    </filter-mapping>
 
 </web-app>

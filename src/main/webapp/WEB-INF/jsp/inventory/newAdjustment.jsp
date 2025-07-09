@@ -18,7 +18,7 @@
         </c:if>
 
         <form action="${pageContext.request.contextPath}/inventory/adjustments/new" method="post">
-            <%-- CSRF token if implemented --%>
+            <input type="hidden" name="_csrf" value="${_csrf}">
             <p>
                 <label for="copyID">Copy ID or Barcode:</label><br>
                 <%-- TODO: Implement a search/lookup for Copy ID by barcode or title --%>

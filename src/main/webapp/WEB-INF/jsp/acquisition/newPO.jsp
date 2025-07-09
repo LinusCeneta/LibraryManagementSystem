@@ -22,7 +22,7 @@
         </c:if>
 
         <form action="${pageContext.request.contextPath}/acquisition/po/new" method="post" id="poForm">
-            <%-- CSRF token if implemented --%>
+            <input type="hidden" name="_csrf" value="${_csrf}">
             <c:if test="${not empty sourceRequest}">
                 <input type="hidden" name="sourceRequestId" value="${sourceRequest.requestID}">
                 <p><em>Creating Purchase Order based on Acquisition Request ID: ${sourceRequest.requestID} - <c:out value="${sourceRequest.bookTitle}"/></em></p>

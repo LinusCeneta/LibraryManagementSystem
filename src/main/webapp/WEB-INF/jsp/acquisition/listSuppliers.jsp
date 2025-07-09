@@ -41,9 +41,9 @@
                             <a href="${pageContext.request.contextPath}/acquisition/suppliers/edit?id=${supplier.supplierID}">Edit</a>
                             <%-- Add delete confirmation later --%>
                             <form action="${pageContext.request.contextPath}/acquisition/suppliers/delete?id=${supplier.supplierID}" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this supplier?');">
+                                <input type="hidden" name="_csrf" value="${_csrf}">
                                 <input type="hidden" name="id" value="${supplier.supplierID}">
                                 <button type="submit">Delete</button>
-                                <%-- CSRF token if implemented --%>
                             </form>
                         </td>
                     </tr>

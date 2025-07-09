@@ -20,7 +20,7 @@
 
 
         <form action="${pageContext.request.contextPath}/acquisition/requests/new" method="post">
-            <%-- CSRF token if implemented --%>
+            <input type="hidden" name="_csrf" value="${_csrf}">
             <p>
                 <label for="bookTitle">Book Title:</label><br>
                 <input type="text" id="bookTitle" name="bookTitle" required size="50">

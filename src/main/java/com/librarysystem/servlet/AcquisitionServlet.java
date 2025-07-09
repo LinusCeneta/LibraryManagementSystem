@@ -182,7 +182,12 @@ public class AcquisitionServlet extends HttpServlet {
         supplier.setPhoneNumber(req.getParameter("phoneNumber"));
         supplier.setEmail(req.getParameter("email"));
         supplier.setPaymentTerms(req.getParameter("paymentTerms"));
-        supplierDAO.addSupplier(supplier);
+        Supplier createdSupplier = supplierDAO.addSupplier(supplier);
+        // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(sessionUser != null && auditLogDAO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "SUPPLIER_ADD", getClientIpAddr(req), "SupplierID: " + createdSupplier.getSupplierID() + ", Name: " + createdSupplier.getSupplierName()));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/suppliers/list");
     }
 
@@ -195,14 +200,30 @@ public class AcquisitionServlet extends HttpServlet {
         supplier.setPhoneNumber(req.getParameter("phoneNumber"));
         supplier.setEmail(req.getParameter("email"));
         supplier.setPaymentTerms(req.getParameter("paymentTerms"));
-        supplierDAO.updateSupplier(supplier);
+        boolean updated = supplierDAO.updateSupplier(supplier);
+        // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(updated && sessionUser != null && auditLogDAO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "SUPPLIER_UPDATE", getClientIpAddr(req), "SupplierID: " + supplier.getSupplierID() + ", Name: " + supplier.getSupplierName()));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/suppliers/list");
     }
 
     private void deleteSupplier(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         int id = Integer.parseInt(req.getParameter("id"));
-        // Add check for dependencies (POs) before deleting
-        supplierDAO.deleteSupplier(id);
+        Optional<Supplier> supplierOpt = supplierDAO.getSupplierById(id); // For logging name before delete
+
+        // Add check for dependencies (POs) before deleting - IMPORTANT
+        // For now, proceeding with delete for audit log example
+        boolean deleted = supplierDAO.deleteSupplier(id);
+
+        // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(deleted && sessionUser != null && auditLogDAO != null && supplierOpt.isPresent()) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "SUPPLIER_DELETE", getClientIpAddr(req), "SupplierID: " + id + ", Name: " + supplierOpt.get().getSupplierName()));
+        } else if (deleted && sessionUser != null && auditLogDAO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "SUPPLIER_DELETE", getClientIpAddr(req), "SupplierID: " + id));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/suppliers/list");
     }
 
@@ -251,7 +272,11 @@ public class AcquisitionServlet extends HttpServlet {
         ar.setStatus("Pending"); // Default status
         ar.setNotes(req.getParameter("notes"));
 
-        acquisitionRequestDAO.createRequest(ar);
+        AcquisitionRequest createdAR = acquisitionRequestDAO.createRequest(ar);
+        // Audit Log
+        if(sessionUser != null && auditLogDAO != null && createdAR != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "ACQ_REQUEST_CREATE", getClientIpAddr(req), "ReqID: " + createdAR.getRequestID() + ", Title: " + createdAR.getBookTitle()));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/requests/list");
     }
 
@@ -259,15 +284,29 @@ public class AcquisitionServlet extends HttpServlet {
         int requestId = Integer.parseInt(req.getParameter("requestId"));
         String status = req.getParameter("status");
         // Add validation for status values
-        acquisitionRequestDAO.updateRequestStatus(requestId, status);
+        boolean updated = acquisitionRequestDAO.updateRequestStatus(requestId, status);
+        // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(updated && sessionUser != null && auditLogDAO != null) {
+             Optional<AcquisitionRequest> arOpt = acquisitionRequestDAO.getRequestById(requestId);
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "ACQ_REQUEST_STATUS_UPDATE", getClientIpAddr(req), "ReqID: " + requestId + ", NewStatus: " + status + arOpt.map(ar -> ", Title: " + ar.getBookTitle()).orElse("")));
+        }
         // Potentially redirect to the request view or list
         resp.sendRedirect(req.getContextPath() + "/acquisition/requests/view?id=" + requestId);
     }
 
     private void deleteAcquisitionRequest(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         int id = Integer.parseInt(req.getParameter("id"));
+        Optional<AcquisitionRequest> arOpt = acquisitionRequestDAO.getRequestById(id); // For logging
         // Add validation, e.g., can only delete if status is 'Pending' or 'Rejected'
-        acquisitionRequestDAO.deleteRequest(id);
+        boolean deleted = acquisitionRequestDAO.deleteRequest(id);
+         // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(deleted && sessionUser != null && auditLogDAO != null && arOpt.isPresent()) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "ACQ_REQUEST_DELETE", getClientIpAddr(req), "ReqID: " + id + ", Title: " + arOpt.get().getBookTitle()));
+        } else if (deleted && sessionUser != null && auditLogDAO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "ACQ_REQUEST_DELETE", getClientIpAddr(req), "ReqID: " + id));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/requests/list");
     }
 
@@ -372,7 +411,11 @@ public class AcquisitionServlet extends HttpServlet {
         po.setOrderLines(lines);
         po.calculateTotalAmount(); // Calculate total based on lines
 
-        purchaseOrderDAO.createPurchaseOrder(po);
+        PurchaseOrder createdPO = purchaseOrderDAO.createPurchaseOrder(po);
+        // Audit Log
+        if(sessionUser != null && auditLogDAO != null && createdPO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "PO_CREATE", getClientIpAddr(req), "PO_ID: " + createdPO.getPoID() + ", PONumber: " + createdPO.getPoNumber() + ", SupplierID: " + createdPO.getSupplierID()));
+        }
 
         // If PO was created from an Acquisition Request, update request status
         String sourceRequestId = req.getParameter("sourceRequestId");
@@ -393,7 +436,12 @@ public class AcquisitionServlet extends HttpServlet {
         int poId = Integer.parseInt(req.getParameter("poId"));
         String status = req.getParameter("status");
         // Add validation for status values
-        purchaseOrderDAO.updatePurchaseOrderStatus(poId, status);
+        boolean updated = purchaseOrderDAO.updatePurchaseOrderStatus(poId, status);
+        // Audit Log
+        User sessionUser = (User) req.getSession().getAttribute("user");
+        if(updated && sessionUser != null && auditLogDAO != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "PO_STATUS_UPDATE", getClientIpAddr(req), "PO_ID: " + poId + ", NewStatus: " + status));
+        }
         resp.sendRedirect(req.getContextPath() + "/acquisition/po/view?id=" + poId);
     }
 
@@ -494,7 +542,11 @@ public class AcquisitionServlet extends HttpServlet {
 
         // This is where the GoodsReceiptNoteDAO would also handle creating Copy entries.
         // The current DAO stub has a placeholder for this.
-        goodsReceiptNoteDAO.createGoodsReceiptNote(grn);
+        GoodsReceiptNote createdGrn = goodsReceiptNoteDAO.createGoodsReceiptNote(grn);
+        // Audit Log
+        if(sessionUser != null && auditLogDAO != null && createdGrn != null) {
+            auditLogDAO.createLogEntry(new AuditLogEntry(sessionUser.getUserID(), sessionUser.getUsername(), "GRN_CREATE", getClientIpAddr(req), "GRN_ID: " + createdGrn.getGrnID() + ", PO_ID: " + createdGrn.getPoID() + ", Invoice: " + createdGrn.getInvoiceNumber()));
+        }
 
         // Update PO Status based on received items (Partial or Full)
         // This logic needs to compare total ordered vs total received across all GRNs for this PO.
