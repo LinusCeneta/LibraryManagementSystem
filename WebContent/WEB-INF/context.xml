@@ -1,0 +1,12 @@
+<Context>
+    <Resource name="jdbc/library"
+              auth="Container"
+              type="javax.sql.DataSource"
+              driverClassName="org.apache.derby.jdbc.EmbeddedDriver"
+              url="jdbc:derby://localhost:1527/library;create=true"
+              username=""
+              password=""
+              maxTotal="20"
+              maxIdle="5"
+              maxWaitMillis="10000"/>
+</Context>

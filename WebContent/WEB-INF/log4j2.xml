@@ -1,0 +1,17 @@
+<!-- log4j2.xml -->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="DEBUG"> <!-- Set root logger to DEBUG -->
+            <AppenderRef ref="Console"/>
+        </Root>
+        <!-- Alternatively, set DEBUG for your specific class/package -->
+        <Logger name="com.yourpackage.YourServlet" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+    </Loggers>
+</Configuration>
