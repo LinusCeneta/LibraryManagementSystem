@@ -229,6 +229,10 @@ public class CopyDAO {
     }
 
     // Getter for ItemTypeID from Copy model
+    // This static inner class was a placeholder.
+    // It should be removed if com.librarysystem.model.Copy is now correctly defined and used.
+    // For now, I'm commenting it out to ensure the main model.Copy is preferred.
+    /*
     public static class Copy {
         private int copyID;
         private int bookID;
@@ -267,4 +271,52 @@ public class CopyDAO {
         public Book getBook() { return book; }
         public void setBook(Book book) { this.book = book; }
     }
+    */
+
+    // Method to get available copies summary per branch for a book
+    public Map<Integer, Integer> getAvailableCopiesCountPerLocation(int bookId) throws SQLException {
+        Map<Integer, Integer> availabilityMap = new java.util.HashMap<>();
+        String sql = "SELECT LocationID, COUNT(*) as AvailableCount FROM Copies " +
+                     "WHERE BookID = ? AND Status = 'Available' GROUP BY LocationID";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, bookId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    availabilityMap.put(rs.getInt("LocationID"), rs.getInt("AvailableCount"));
+                }
+            }
+        }
+        return availabilityMap;
+    }
+     public List<com.librarysystem.model.Copy> findCopiesByCriteria(int bookId, Integer locationId, String status) throws SQLException {
+        List<com.librarysystem.model.Copy> copies = new ArrayList<>();
+        StringBuilder sqlBuilder = new StringBuilder("SELECT c.*, b.Title as BookTitle, b.ISBN as BookISBN FROM Copies c JOIN Books b ON c.BookID = b.BookID WHERE c.BookID = ?");
+        if (locationId != null) {
+            sqlBuilder.append(" AND c.LocationID = ?");
+        }
+        if (status != null && !status.isEmpty()) {
+            sqlBuilder.append(" AND c.Status = ?");
+        }
+        sqlBuilder.append(" ORDER BY c.CopyBarcode");
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlBuilder.toString())) {
+            int paramIndex = 1;
+            pstmt.setInt(paramIndex++, bookId);
+            if (locationId != null) {
+                pstmt.setInt(paramIndex++, locationId);
+            }
+            if (status != null && !status.isEmpty()) {
+                pstmt.setString(paramIndex++, status);
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    copies.add(mapRowToCopyWithBookDetails(rs)); // Use the main model Copy
+                }
+            }
+        }
+        return copies;
+    }
+
 }

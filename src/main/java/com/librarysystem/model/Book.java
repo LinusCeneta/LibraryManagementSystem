@@ -155,4 +155,62 @@ public class Book {
                 ", isbn='" + isbn + '\'' +
                 '}';
     }
+
+    // Fields for search/detail display
+    private Publisher publisher; // Object form of PublisherID
+    private List<Author> bookAuthors;
+    private List<Category> bookCategories;
+    private List<Copy> availableCopies; // Summary of available copies, perhaps per location
+
+    public Book() {
+        this.bookAuthors = new ArrayList<>();
+        this.bookCategories = new ArrayList<>();
+        this.availableCopies = new ArrayList<>();
+    }
+
+
+    public Publisher getPublisher() {
+        return publisher;
+    }
+
+    public void setPublisher(Publisher publisher) {
+        this.publisher = publisher;
+        if (publisher != null) this.publisherName = publisher.getPublisherName(); // Keep simple field in sync
+    }
+
+    public List<Author> getBookAuthors() {
+        return bookAuthors;
+    }
+
+    public void setBookAuthors(List<Author> bookAuthors) {
+        this.bookAuthors = bookAuthors;
+        // Optionally update authorsConcatenated from this list
+    }
+
+    public void addAuthor(Author author) {
+        if (this.bookAuthors == null) this.bookAuthors = new ArrayList<>();
+        this.bookAuthors.add(author);
+    }
+
+    public List<Category> getBookCategories() {
+        return bookCategories;
+    }
+
+    public void setBookCategories(List<Category> bookCategories) {
+        this.bookCategories = bookCategories;
+         // Optionally update categoriesConcatenated from this list
+    }
+
+    public void addCategory(Category category) {
+        if (this.bookCategories == null) this.bookCategories = new ArrayList<>();
+        this.bookCategories.add(category);
+    }
+
+    public List<Copy> getAvailableCopies() {
+        return availableCopies;
+    }
+
+    public void setAvailableCopies(List<Copy> availableCopies) {
+        this.availableCopies = availableCopies;
+    }
 }
