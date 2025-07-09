@@ -28,9 +28,10 @@ public class UserDAO {
     }
 
     // Constructor for injecting DAOs (useful for testing or DI frameworks)
+    // Updated to handle potentially null DAOs if default constructor is used by other DAOs
     public UserDAO(RoleDAO roleDAO, UserProfileDAO userProfileDAO) {
-        this.roleDAO = roleDAO;
-        this.userProfileDAO = userProfileDAO;
+        this.roleDAO = (roleDAO != null) ? roleDAO : new RoleDAO();
+        this.userProfileDAO = (userProfileDAO != null) ? userProfileDAO : new UserProfileDAO();
     }
 
     public User createUser(User user, String plainPassword) throws SQLException {
@@ -254,11 +255,23 @@ public class UserDAO {
         user.setEmail(rs.getString("Email"));
         user.setFirstName(rs.getString("FirstName"));
         user.setLastName(rs.getString("LastName"));
-        user.setRoleID(rs.getInt("RoleID")); // Store RoleID
+        user.setRoleID(rs.getInt("RoleID")); // Store RoleID for internal use
         user.setActive(rs.getBoolean("IsActive"));
         user.setProfilePhotoURL(rs.getString("ProfilePhotoURL"));
         user.setDateRegistered(rs.getTimestamp("DateRegistered"));
         user.setLastLoginDate(rs.getTimestamp("LastLoginDate"));
+
+        // Map new circulation-related fields if they are in the Users table
+        // These might require ALTER TABLE Users from circulation_schema.sql to be applied first
+        if (hasColumn(rs, "MembershipTierID")) {
+            user.setMembershipTierID(rs.getObject("MembershipTierID", Integer.class));
+        }
+        if (hasColumn(rs, "MembershipStatus")) {
+            user.setMembershipStatus(rs.getString("MembershipStatus"));
+        }
+        if (hasColumn(rs, "CurrentFineBalance")) {
+            user.setCurrentFineBalance(rs.getBigDecimal("CurrentFineBalance"));
+        }
         return user;
     }
 
@@ -267,15 +280,85 @@ public class UserDAO {
 
         // Populate Role object
         Role role = new Role();
-        role.setRoleID(rs.getInt("RoleID"));
-        role.setRoleName(rs.getString("RoleName")); // Assumes RoleName is joined
+        role.setRoleID(user.getRoleID()); // Use RoleID from user object
+        // RoleName might be joined or fetched separately. Assuming joined for now.
+        if (hasColumn(rs, "RoleName")) {
+             role.setRoleName(rs.getString("RoleName"));
+        } else {
+            // Fallback: fetch role if not joined (less efficient for lists)
+            if (roleDAO == null) this.roleDAO = new RoleDAO(); // Ensure roleDAO is initialized
+            roleDAO.getRoleById(user.getRoleID()).ifPresent(r -> role.setRoleName(r.getRoleName()));
+        }
         user.setRole(role);
 
-        // Optionally, fetch and set UserProfile here if always needed
-        // This makes an extra DB call per user if not joined; consider joining if performance is critical
-        // For now, UserProfile is fetched on demand by services/servlets
+        // Populate MembershipTier object if MembershipTierID exists
+        if (user.getMembershipTierID() != null) {
+            MembershipTier tier = new MembershipTier();
+            tier.setMembershipTierID(user.getMembershipTierID());
+            // If Tier details are joined in the query that called this method:
+            if (hasColumn(rs, "TierName")) tier.setTierName(rs.getString("TierName"));
+            if (hasColumn(rs, "BorrowingLimit")) tier.setBorrowingLimit(rs.getInt("BorrowingLimit"));
+            if (hasColumn(rs, "LoanDurationDays")) tier.setLoanDurationDays(rs.getInt("LoanDurationDays"));
+            if (hasColumn(rs, "RenewalLimit")) tier.setRenewalLimit(rs.getInt("RenewalLimit"));
+
+            // If TierName is still null (not joined), fetch the tier separately
+            if (tier.getTierName() == null) {
+                MembershipTierDAO tierDAO = new MembershipTierDAO(); // Or inject if available
+                tierDAO.getMembershipTierById(user.getMembershipTierID()).ifPresent(user::setMembershipTier);
+            } else {
+                 user.setMembershipTier(tier);
+            }
+        }
+
+        // UserProfile is typically fetched on demand (e.g., in UserServlet when viewing profile)
+        // to avoid N+1 queries on lists of users.
         // userProfileDAO.getUserProfileByUserId(user.getUserID()).ifPresent(user::setUserProfile);
 
         return user;
+    }
+
+    // Helper method to check if a ResultSet contains a specific column
+    // This is useful when columns might be optional (e.g. from ALTER TABLE) or from joins
+    private boolean hasColumn(ResultSet rs, String columnName) throws SQLException {
+        ResultSetMetaData rsmd = rs.getMetaData();
+        int columns = rsmd.getColumnCount();
+        for (int x = 1; x <= columns; x++) {
+            if (columnName.equalsIgnoreCase(rsmd.getColumnName(x))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Methods to update new User fields (MembershipStatus, CurrentFineBalance)
+    public boolean updateMembershipStatus(int userId, String status) throws SQLException {
+        String sql = "UPDATE Users SET MembershipStatus = ? WHERE UserID = ?";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, status);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean updateUserFineBalance(int userId, BigDecimal newFineBalance) throws SQLException {
+        String sql = "UPDATE Users SET CurrentFineBalance = ? WHERE UserID = ?";
+         try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setBigDecimal(1, newFineBalance);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean assignMembershipTier(int userId, int tierId) throws SQLException {
+        // Optional: Validate tierId exists using MembershipTierDAO first
+        String sql = "UPDATE Users SET MembershipTierID = ? WHERE UserID = ?";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, tierId);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        }
     }
 }

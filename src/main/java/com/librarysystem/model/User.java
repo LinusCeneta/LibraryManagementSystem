@@ -33,7 +33,51 @@ public class User {
     }
 
     public void setRole(String role) {
-        this.role = role;
+        // This setter might be problematic if Role object is primary way to manage role
+        // Prefer setRole(Role role)
+        this.role = role; // Keep for now if UserServlet uses it, but ideally refactor
+    }
+
+    // Fields from schema for circulation
+    private Integer membershipTierID;
+    private MembershipTier membershipTier; // Object representation
+    private String membershipStatus; // Active, Suspended, Expired
+    private java.math.BigDecimal currentFineBalance;
+
+
+    public Integer getMembershipTierID() {
+        return membershipTierID;
+    }
+
+    public void setMembershipTierID(Integer membershipTierID) {
+        this.membershipTierID = membershipTierID;
+    }
+
+    public MembershipTier getMembershipTier() {
+        return membershipTier;
+    }
+
+    public void setMembershipTier(MembershipTier membershipTier) {
+        this.membershipTier = membershipTier;
+        if (membershipTier != null) {
+            this.membershipTierID = membershipTier.getMembershipTierID();
+        }
+    }
+
+    public String getMembershipStatus() {
+        return membershipStatus;
+    }
+
+    public void setMembershipStatus(String membershipStatus) {
+        this.membershipStatus = membershipStatus;
+    }
+
+    public java.math.BigDecimal getCurrentFineBalance() {
+        return currentFineBalance;
+    }
+
+    public void setCurrentFineBalance(java.math.BigDecimal currentFineBalance) {
+        this.currentFineBalance = currentFineBalance;
     }
 
     // Add other user fields and methods as needed

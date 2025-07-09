@@ -91,4 +91,16 @@ public class Copy {
                 ", condition='" + condition + '\'' +
                 '}';
     }
+
+    // To hold Book details when joining in queries
+    private Book book;
+
+    public Book getBook() {
+        return book;
+    }
+
+    public void setBook(Book book) {
+        this.book = book;
+    }
+
 }
